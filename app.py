@@ -7,6 +7,7 @@ import hashlib
 import shutil
 import json
 import time
+import html
 from dataclasses import dataclass
 from typing import Dict, Literal, List, Tuple
 
@@ -1045,15 +1046,449 @@ def to_markdown_conversation(messages) -> str:
     return "\n".join(md_parts).strip()
 
 
+def _source_location(metadata: dict) -> str:
+    parts: List[str] = []
+    page = metadata.get("page")
+    sheet = metadata.get("sheet")
+    rows = metadata.get("rows")
+    if page is not None:
+        parts.append(f"Page {int(page) + 1}")
+    if sheet:
+        parts.append(f"Feuille {sheet}")
+    if rows:
+        parts.append(f"Lignes {rows}")
+    return " | ".join(parts) if parts else "Extrait"
+
+
+def serialize_sources(docs: List[Document]) -> List[dict]:
+    items: List[dict] = []
+    for i, doc in enumerate(docs, start=1):
+        metadata = dict(doc.metadata or {})
+        items.append(
+            {
+                "rank": i,
+                "name": os.path.basename(str(metadata.get("source", "document"))),
+                "location": _source_location(metadata),
+                "excerpt": (doc.page_content or "").strip(),
+            }
+        )
+    return items
+
+
+def render_status_card(label: str, value: str, caption: str = "") -> None:
+    safe_label = html.escape(label)
+    safe_value = html.escape(value)
+    safe_caption = html.escape(caption)
+    st.markdown(
+        f"""
+        <div class="status-card">
+            <div class="status-label">{safe_label}</div>
+            <div class="status-value">{safe_value}</div>
+            <div class="status-caption">{safe_caption}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_source_panel(items: List[dict]) -> None:
+    if not items:
+        st.markdown(
+            """
+            <div class="empty-panel">
+                <div class="empty-title">Aucune source recente</div>
+                <div class="empty-copy">Les extraits RAG apparaitront ici apres une reponse documentee.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    for item in items:
+        title = f"[{item['rank']}] {item['name']}"
+        excerpt = (item["excerpt"] or "").replace("\n", " ").strip()
+        if len(excerpt) > 320:
+            excerpt = excerpt[:317].rstrip() + "..."
+        with st.expander(title, expanded=(item["rank"] == 1)):
+            st.markdown(
+                f"""
+                <div class="source-meta">{html.escape(item['location'])}</div>
+                <div class="source-excerpt">{html.escape(excerpt) or "Aucun extrait disponible."}</div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+
+def render_document_panel(indexed_files: List[Tuple[int, str, str, int]]) -> None:
+    if not indexed_files:
+        st.markdown(
+            """
+            <div class="empty-panel">
+                <div class="empty-title">Aucun document actif</div>
+                <div class="empty-copy">Ajoute puis indexe des PDF, CSV ou fichiers Excel pour alimenter le RAG.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    for fid, name, _, _ in indexed_files:
+        st.markdown(
+            f"""
+            <div class="doc-card">
+                <div class="doc-icon">DOC</div>
+                <div>
+                    <div class="doc-title">{html.escape(name)}</div>
+                    <div class="doc-copy">Document actif • id {fid}</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def _inject_theme() -> None:
+    st.markdown(
+        """
+        <style>
+        :root {
+            --bg: #f3efe7;
+            --surface: rgba(255, 252, 247, 0.92);
+            --surface-strong: #fffdf8;
+            --line: rgba(92, 72, 52, 0.16);
+            --ink: #1f2933;
+            --muted: #6b7280;
+            --accent: #c4632d;
+            --accent-soft: rgba(196, 99, 45, 0.12);
+            --accent-deep: #8c3f18;
+            --success: #1f6f5f;
+            --user-bg: #f4d7c6;
+            --assistant-bg: #fffaf2;
+        }
+
+        .stApp {
+            background:
+                radial-gradient(circle at top left, rgba(196, 99, 45, 0.20), transparent 28%),
+                radial-gradient(circle at top right, rgba(31, 111, 95, 0.12), transparent 24%),
+                linear-gradient(180deg, #f8f3ec 0%, var(--bg) 100%);
+            color: var(--ink);
+        }
+
+        .block-container {
+            padding-top: 1.4rem;
+            padding-bottom: 1.6rem;
+            max-width: 1440px;
+        }
+
+        h1, h2, h3 {
+            font-family: Georgia, "Times New Roman", serif;
+            letter-spacing: -0.02em;
+            color: #18212a;
+        }
+
+        .hero-shell {
+            padding: 1.6rem 1.8rem;
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(250,244,235,0.88));
+            box-shadow: 0 18px 48px rgba(55, 40, 24, 0.08);
+            margin-bottom: 1.1rem;
+        }
+
+        .hero-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-radius: 999px;
+            padding: 0.35rem 0.8rem;
+            background: var(--accent-soft);
+            color: var(--accent-deep);
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .hero-kicker::before {
+            content: "AI";
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.8rem;
+            height: 1.8rem;
+            border-radius: 999px;
+            background: var(--accent);
+            color: white;
+            font-size: 0.68rem;
+            font-weight: 800;
+        }
+
+        .hero-title {
+            margin: 0.9rem 0 0.4rem;
+            font-size: clamp(2rem, 3vw, 3.2rem);
+            line-height: 1.05;
+            font-weight: 700;
+        }
+
+        .hero-subtitle {
+            max-width: 70ch;
+            color: #51606f;
+            font-size: 1rem;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, rgba(255, 251, 245, 0.97), rgba(247, 240, 230, 0.96));
+            border-right: 1px solid var(--line);
+        }
+
+        [data-testid="stSidebar"] .block-container {
+            padding-top: 1.2rem;
+        }
+
+        .sidebar-title {
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .sidebar-copy {
+            color: var(--muted);
+            font-size: 0.92rem;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+
+        .section-card {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            padding: 1rem 1.1rem 1.1rem;
+            box-shadow: 0 14px 32px rgba(55, 40, 24, 0.05);
+            margin-bottom: 1rem;
+        }
+
+        .section-label {
+            font-size: 0.76rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--accent-deep);
+            margin-bottom: 0.2rem;
+        }
+
+        .section-title {
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 0.2rem;
+        }
+
+        .section-copy {
+            color: var(--muted);
+            font-size: 0.92rem;
+            margin-bottom: 0.9rem;
+        }
+
+        .status-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(251,245,237,0.94));
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            padding: 1rem;
+            min-height: 124px;
+            box-shadow: 0 14px 28px rgba(55, 40, 24, 0.05);
+        }
+
+        .status-label {
+            font-size: 0.74rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--accent-deep);
+            margin-bottom: 0.45rem;
+        }
+
+        .status-value {
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 1.4rem;
+            line-height: 1.1;
+            color: #1e2935;
+            margin-bottom: 0.45rem;
+        }
+
+        .status-caption {
+            font-size: 0.9rem;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        .panel-shell {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            padding: 1rem 1rem 1.2rem;
+            box-shadow: 0 18px 36px rgba(55, 40, 24, 0.06);
+            height: 100%;
+        }
+
+        .panel-title {
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.2rem;
+        }
+
+        .panel-copy {
+            color: var(--muted);
+            font-size: 0.92rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .empty-panel {
+            border: 1px dashed rgba(92, 72, 52, 0.25);
+            border-radius: 18px;
+            padding: 1rem;
+            background: rgba(255,255,255,0.55);
+        }
+
+        .empty-title {
+            font-weight: 700;
+            color: #253241;
+            margin-bottom: 0.25rem;
+        }
+
+        .empty-copy, .source-meta, .doc-copy {
+            color: var(--muted);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .source-excerpt {
+            margin-top: 0.55rem;
+            padding: 0.85rem 0.95rem;
+            border-radius: 16px;
+            background: rgba(255,255,255,0.75);
+            border: 1px solid rgba(92, 72, 52, 0.12);
+            white-space: pre-wrap;
+            line-height: 1.55;
+        }
+
+        .doc-card {
+            display: flex;
+            gap: 0.8rem;
+            align-items: center;
+            border: 1px solid rgba(92, 72, 52, 0.12);
+            border-radius: 18px;
+            padding: 0.85rem 0.95rem;
+            background: rgba(255,255,255,0.68);
+            margin-bottom: 0.7rem;
+        }
+
+        .doc-icon {
+            width: 2.2rem;
+            height: 2.2rem;
+            border-radius: 14px;
+            background: var(--accent-soft);
+            color: var(--accent-deep);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.72rem;
+            font-weight: 800;
+            flex: 0 0 auto;
+        }
+
+        .doc-title {
+            font-weight: 700;
+            color: #243140;
+        }
+
+        .conversation-card {
+            border: 1px solid rgba(92, 72, 52, 0.12);
+            border-radius: 20px;
+            padding: 0.9rem 1rem;
+            background: rgba(255,255,255,0.72);
+            margin-bottom: 0.8rem;
+        }
+
+        .conversation-card.active {
+            border-color: rgba(196, 99, 45, 0.45);
+            background: linear-gradient(180deg, rgba(255, 248, 241, 0.92), rgba(255,255,255,0.9));
+            box-shadow: 0 10px 24px rgba(196, 99, 45, 0.10);
+        }
+
+        .conversation-title {
+            font-weight: 700;
+            color: #243140;
+            margin-bottom: 0.2rem;
+        }
+
+        .conversation-meta {
+            color: var(--muted);
+            font-size: 0.88rem;
+        }
+
+        [data-testid="stChatMessage"] {
+            border-radius: 24px;
+            padding: 0.85rem 1rem;
+            border: 1px solid rgba(92, 72, 52, 0.10);
+            box-shadow: 0 10px 24px rgba(55, 40, 24, 0.04);
+            margin-bottom: 0.75rem;
+        }
+
+        [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+            background: linear-gradient(180deg, rgba(244, 215, 198, 0.92), rgba(253, 245, 239, 0.94));
+        }
+
+        [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
+            background: linear-gradient(180deg, rgba(255, 251, 244, 0.96), rgba(255,255,255,0.95));
+        }
+
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 0.35rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            background: rgba(255,255,255,0.72);
+            border: 1px solid rgba(92, 72, 52, 0.10);
+            border-radius: 999px;
+            padding: 0.35rem 0.9rem;
+        }
+
+        .stTabs [aria-selected="true"] {
+            background: var(--accent-soft);
+            border-color: rgba(196, 99, 45, 0.22);
+            color: var(--accent-deep);
+        }
+
+        .stButton > button, .stDownloadButton > button {
+            border-radius: 16px;
+            border: 1px solid rgba(92, 72, 52, 0.15);
+            background: linear-gradient(180deg, #fffdf9, #f8efe5);
+            color: #243140;
+            font-weight: 600;
+        }
+
+        .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"], .stMultiSelect div[data-baseweb="select"] {
+            border-radius: 16px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 # -----------------------------
 # Streamlit UI
 # -----------------------------
 _init_meta_db()
 _init_conversations_db()
 
-st.set_page_config(page_title="Chatbot NJAB", page_icon="📚", layout="centered")
-st.title("Chatbot NJAB")
-st.caption("Upload PDF/Excel/CSV -> Index -> Chat (modes + memoire longue + streaming + sources)")
+st.set_page_config(page_title="Atelier NJAB", page_icon="📚", layout="wide")
+_inject_theme()
 
 # session_id persistent in UI
 # -----------------------------
@@ -1082,39 +1517,59 @@ except sqlite3.OperationalError as e:
         st.stop()
     raise
 
-# Sidebar
-with st.sidebar:
-    st.subheader("Reglages")
-    meta = _get_meta(session_id)
+meta = _get_meta(session_id)
 
+if "last_sources" not in st.session_state:
+    st.session_state["last_sources"] = []
+if st.session_state.get("last_sources_session") != session_id:
+    st.session_state["last_sources"] = []
+    st.session_state["last_sources_session"] = session_id
+
+with st.sidebar:
+    st.markdown('<div class="sidebar-title">Configuration</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sidebar-copy">Pilote le modele, le comportement de reponse et la couche documentaire depuis ce panneau.</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <div class="section-card">
+            <div class="section-label">Session</div>
+            <div class="section-title">Parametres du moteur</div>
+            <div class="section-copy">Reglages generaux du chat et de la generation.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     model_name = st.selectbox("Modele", ["gpt-4o-mini", "gpt-4.1-mini"], index=0)
     temperature = st.slider("Temperature", min_value=0.0, max_value=1.0, value=0.3, step=0.05)
     strict_rag = st.toggle("Mode strict sources", value=False, help="Ne repondre que si les sources suffisent.")
-
-    # Mode
     mode = st.selectbox(
         "Mode",
         ["prof", "quiz", "correcteur"],
         index=["prof", "quiz", "correcteur"].index(meta.mode),
     )
     meta.mode = mode  # type: ignore
-
     extra = st.text_area(
-        "Instructions supplementaires (optionnel)",
+        "Instructions supplementaires",
         value="",
-        height=90,
+        height=100,
         placeholder="Ex: Sois tres concis / Utilise des formules / Donne un plan avant de repondre...",
     )
 
-    st.divider()
-    st.subheader("Memoire longue (resume)")
-    st.text_area("Resume", value=meta.summary or "", height=160, disabled=True)
-
-    st.divider()
-    st.subheader("RAG (documents)")
+    st.markdown(
+        """
+        <div class="section-card">
+            <div class="section-label">RAG</div>
+            <div class="section-title">Corpus et index</div>
+            <div class="section-copy">Active le RAG, ajuste le rappel et gere les fichiers a indexer.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     meta.rag_enabled = st.toggle("Activer RAG", value=meta.rag_enabled)
     meta.rag_k = st.slider("Top-k passages", min_value=2, max_value=10, value=int(meta.rag_k), step=1)
-
     uploaded = st.file_uploader(
         "Ajoute des fichiers (PDF/CSV/XLSX)",
         type=["pdf", "csv", "xlsx", "xls"],
@@ -1132,8 +1587,8 @@ with st.sidebar:
         )
         selected_upload_indices = [i for i, f in enumerate(uploaded) if f.name in selected_labels]
 
-    col1, col2 = st.columns(2)
-    with col1:
+    s1, s2 = st.columns(2)
+    with s1:
         if st.button("Indexer", use_container_width=True):
             if not uploaded:
                 st.warning("Ajoute au moins un fichier avant d'indexer.")
@@ -1174,15 +1629,13 @@ with st.sidebar:
                     st.error("Aucun document lisible trouve.")
                 if skipped:
                     st.caption("Doublons ignores: " + ", ".join(skipped[:5]))
-            
-
-    with col2:
+    with s2:
         if st.button("Clear index", use_container_width=True):
             clear_rag_index(session_id, meta)
+            st.session_state["last_sources"] = []
             st.success("Index RAG efface.")
             st.rerun()
 
-    st.caption(f"Index pret: {'OK' if meta.rag_ready else 'NON'} | Collection: {meta.rag_collection}")
     indexed_files = _list_rag_files(session_id, include_inactive=False)
     if indexed_files:
         indexed_labels = {str(fid): f"{name} (id:{fid})" for fid, name, _, _ in indexed_files}
@@ -1192,137 +1645,81 @@ with st.sidebar:
             format_func=lambda x: indexed_labels[x],
             help="Supprime les documents selectionnes de l'index puis reconstruit.",
         )
-        if st.button("Supprimer documents selectionnes", use_container_width=True):
+        if st.button("Supprimer selection", use_container_width=True):
             ids = [int(x) for x in to_remove]
             _deactivate_rag_files(ids)
             with st.spinner("Reconstruction de l'index..."):
                 docs, chunks = rebuild_rag_index_from_active_files(session_id, meta)
             st.success(f"Index reconstruit. Docs: {docs} | Chunks: {chunks}")
             st.rerun()
-    if st.button("Nettoyage stockage", use_container_width=True):
-        removed, bytes_removed = cleanup_storage()
-        _db_checkpoint()
-        st.success(f"Nettoyage termine. Fichiers supprimes: {removed}, espace libere: {bytes_removed} bytes")
-    
-    if st.button("Optimiser index (rebuild)", use_container_width=True):
+
+    if st.button("Optimiser index", use_container_width=True):
         with st.spinner("Optimisation..."):
             docs, chunks = rebuild_rag_index_from_active_files(session_id, meta)
         st.success(f"Optimisation OK. Docs: {docs} | Chunks: {chunks}")
         _db_checkpoint()
         st.rerun()
 
-    st.divider()
-    st.subheader("Export")
-    hist_msgs = get_full_history(session_id).messages
-    md_text = to_markdown_conversation(hist_msgs)
-    st.download_button(
-        "Telecharger resume (.txt)",
-        data=(meta.summary or ""),
-        file_name="resume_chat.txt",
-        mime="text/plain",
-        use_container_width=True,
-    )
-    st.download_button(
-        "Telecharger conversation (.md)",
-        data=md_text,
-        file_name="conversation.md",
-        mime="text/markdown",
-        use_container_width=True,
-    )
+    if st.button("Nettoyage stockage", use_container_width=True):
+        removed, bytes_removed = cleanup_storage()
+        _db_checkpoint()
+        st.success(f"Nettoyage termine. Fichiers supprimes: {removed}, espace libere: {bytes_removed} bytes")
 
-    st.divider()
-    st.subheader("Conversations")
-    query_conv = st.text_input("Rechercher", value="", placeholder="Titre...")
-    show_archived = st.toggle("Afficher archivees", value=False)
-
-    convs = _list_conversations(limit=100, include_archived=show_archived, query=query_conv)
-    sid_options = [sid for (sid, _, _, _) in convs]
-    sid_to_label = {
-        sid: (f"{title} (archivee)" if archived else title)
-        for (sid, title, updated_at, archived) in convs
-    }
-    sid_to_title = {sid: title for (sid, title, _, _) in convs}
-    sid_to_archived = {sid: bool(archived) for (sid, _, _, archived) in convs}
-
-    if not sid_options:
-        sid_options = [session_id]
-        sid_to_label = {session_id: f"Conversation {session_id[:8]}"}
-        sid_to_title = {session_id: f"Conversation {session_id[:8]}"}
-
-    current_idx = sid_options.index(session_id) if session_id in sid_options else 0
-    selected_sid = st.selectbox(
-        "Reprendre une conversation",
-        options=sid_options,
-        index=current_idx,
-        format_func=lambda sid: sid_to_label.get(sid, sid),
-        key="conversation_selector",
-    )
-
-    if selected_sid != session_id:
-        new_sid = selected_sid
-        st.session_state.session_id = new_sid
-        st.query_params["sid"] = new_sid
-        st.rerun()
-
-    cconv1, cconv2 = st.columns(2)
-    with cconv1:
-        if st.button("Dupliquer", use_container_width=True):
-            dup_sid = _duplicate_conversation(selected_sid, f"Copie - {sid_to_title.get(selected_sid, 'Conversation')}")
-            st.session_state.session_id = dup_sid
-            st.query_params["sid"] = dup_sid
-            st.success("Conversation dupliquee.")
-            st.rerun()
-    with cconv2:
-        arch_label = "Desarchiver" if sid_to_archived.get(selected_sid, False) else "Archiver"
-        if st.button(arch_label, use_container_width=True):
-            _archive_conversation(selected_sid, not sid_to_archived.get(selected_sid, False))
-            if selected_sid == session_id and not show_archived and not sid_to_archived.get(selected_sid, False):
-                next_convs = _list_conversations(limit=100, include_archived=False)
-                if next_convs:
-                    st.session_state.session_id = next_convs[0][0]
-                    st.query_params["sid"] = next_convs[0][0]
-            st.rerun()
-
-    confirm_key = "confirm_delete_sid"
-    if st.button("Supprimer la conversation", use_container_width=True):
-        st.session_state[confirm_key] = selected_sid
-
-    if st.session_state.get(confirm_key) == selected_sid:
-        st.warning("Confirmer la suppression definitive de cette conversation ?")
-        cdel1, cdel2 = st.columns(2)
-        with cdel1:
-            if st.button("Confirmer suppression", use_container_width=True):
-                sid_to_delete = selected_sid
-                _delete_conversation(sid_to_delete)
-                st.session_state.pop(confirm_key, None)
-
-                if sid_to_delete == session_id:
-                    remaining = [sid for sid in sid_options if sid != sid_to_delete]
-                    if remaining:
-                        next_sid = remaining[0]
-                    else:
-                        next_sid = str(uuid.uuid4())
-                        _ensure_conversation_exists(next_sid)
-                    st.session_state.session_id = next_sid
-                    st.query_params["sid"] = next_sid
-                st.rerun()
-        with cdel2:
-            if st.button("Annuler", use_container_width=True):
-                st.session_state.pop(confirm_key, None)
-                st.rerun()
-
-    if st.button("Nouvelle conversation", use_container_width=True):
-        st.session_state["show_new_conv_dialog"] = True
-        st.session_state["new_conv_title"] = ""
-        st.rerun()
-
-    st.caption(f"Session: {session_id[:8]}...")
     meta_fingerprint = (meta.mode, meta.rag_enabled, int(meta.rag_k), meta.rag_collection, meta.rag_ready, meta.summary)
     prev = st.session_state.get("meta_fp")
     if prev != meta_fingerprint:
         st.session_state["meta_fp"] = meta_fingerprint
-        
     _upsert_meta(session_id, meta)
+
+hist_msgs = get_full_history(session_id).messages
+md_text = to_markdown_conversation(hist_msgs)
+query_conv = st.session_state.get("query_conv", "")
+show_archived = st.session_state.get("show_archived", False)
+convs = _list_conversations(limit=100, include_archived=show_archived, query=query_conv)
+sid_options = [sid for (sid, _, _, _) in convs]
+sid_to_label = {
+    sid: (f"{title} (archivee)" if archived else title)
+    for (sid, title, updated_at, archived) in convs
+}
+sid_to_title = {sid: title for (sid, title, _, _) in convs}
+sid_to_archived = {sid: bool(archived) for (sid, _, _, archived) in convs}
+sid_to_updated = {sid: updated_at for (sid, _, updated_at, _) in convs}
+
+if not sid_options:
+    sid_options = [session_id]
+    sid_to_label = {session_id: f"Conversation {session_id[:8]}"}
+    sid_to_title = {session_id: f"Conversation {session_id[:8]}"}
+    sid_to_archived = {session_id: False}
+    sid_to_updated = {session_id: ""}
+
+selected_sid = session_id if session_id in sid_options else sid_options[0]
+
+st.markdown(
+    f"""
+    <div class="hero-shell">
+        <div class="hero-kicker">Assistant documentaire</div>
+        <div class="hero-title">Atelier NJAB</div>
+        <p class="hero-subtitle">Un cockpit de conversation pour interroger tes documents, suivre les sources en direct et piloter tes sessions avec une interface plus claire, plus structurée et plus premium.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+stats = st.columns(5)
+with stats[0]:
+    render_status_card("Documents indexes", str(len(indexed_files)), "Corpus actif connecte au moteur RAG.")
+with stats[1]:
+    render_status_card("Mode actif", meta.mode.capitalize(), "Posture pedagogique actuellement selectionnee.")
+with stats[2]:
+    render_status_card("Modele actif", model_name, "Generation et streaming de la reponse.")
+with stats[3]:
+    rag_state = "Actif" if meta.rag_enabled and meta.rag_ready else "En attente"
+    rag_copy = f"Top-k {int(meta.rag_k)}" if meta.rag_enabled else "Desactive"
+    render_status_card("Etat du RAG", rag_state, rag_copy)
+with stats[4]:
+    render_status_card("Session", session_id[:8], "Conversation courante et historique persistant.")
+
+main_col, side_col = st.columns([1.95, 1.05], gap="large")
 
 # Popup: creation d'une nouvelle conversation avec titre
 if st.session_state.get("show_new_conv_dialog"):
@@ -1379,18 +1776,137 @@ if st.session_state.get("show_new_conv_dialog"):
                     st.session_state.pop("new_conv_title_fallback", None)
                     st.rerun()
 
-# Display transcript from SQLite (source of truth)
-history_messages = get_full_history(session_id).messages
-for m in history_messages:
-    role = "user" if m.type == "human" else "assistant" if m.type == "ai" else "assistant"
-    with st.chat_message(role):
-        st.markdown(fix_latex(m.content))
+with main_col:
+    st.markdown(
+        """
+        <div class="panel-shell">
+            <div class="panel-title">Conversation</div>
+            <div class="panel-copy">Espace principal de dialogue, avec streaming, markdown et citations documentaires.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    history_messages = get_full_history(session_id).messages
+    for m in history_messages:
+        role = "user" if m.type == "human" else "assistant" if m.type == "ai" else "assistant"
+        with st.chat_message(role):
+            st.markdown(fix_latex(m.content))
+
+with side_col:
+    st.markdown(
+        """
+        <div class="panel-shell">
+            <div class="panel-title">Panneau secondaire</div>
+            <div class="panel-copy">Sources, resume, documents actifs et conversations dans une zone laterale dediee.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    tab_sources, tab_summary, tab_docs, tab_convs = st.tabs(["Sources", "Resume", "Documents", "Conversations"])
+
+    with tab_sources:
+        render_source_panel(st.session_state.get("last_sources", []))
+
+    with tab_summary:
+        st.text_area("Resume de session", value=meta.summary or "", height=280, disabled=True, label_visibility="collapsed")
+        st.download_button(
+            "Telecharger le resume",
+            data=(meta.summary or ""),
+            file_name="resume_chat.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
+
+    with tab_docs:
+        render_document_panel(indexed_files)
+        st.download_button(
+            "Telecharger la conversation (.md)",
+            data=md_text,
+            file_name="conversation.md",
+            mime="text/markdown",
+            use_container_width=True,
+        )
+
+    with tab_convs:
+        q_val = st.text_input("Rechercher", value=query_conv, placeholder="Titre...", key="query_conv")
+        archived_val = st.toggle("Afficher archivees", value=show_archived, key="show_archived")
+        if q_val != query_conv or archived_val != show_archived:
+            st.rerun()
+
+        for sid, title, updated_at, archived in convs[:10]:
+            active_cls = " active" if sid == session_id else ""
+            st.markdown(
+                f"""
+                <div class="conversation-card{active_cls}">
+                    <div class="conversation-title">{html.escape(title)}</div>
+                    <div class="conversation-meta">Maj: {html.escape(updated_at or 'inconnue')} | {'Archivee' if archived else 'Active'}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if sid != session_id and st.button("Ouvrir", key=f"open_conv_{sid}", use_container_width=True):
+                st.session_state.session_id = sid
+                st.query_params["sid"] = sid
+                st.rerun()
+
+        cc1, cc2 = st.columns(2)
+        with cc1:
+            if st.button("Nouvelle conversation", use_container_width=True):
+                st.session_state["show_new_conv_dialog"] = True
+                st.session_state["new_conv_title"] = ""
+                st.rerun()
+        with cc2:
+            if st.button("Dupliquer l'active", use_container_width=True):
+                dup_sid = _duplicate_conversation(selected_sid, f"Copie - {sid_to_title.get(selected_sid, 'Conversation')}")
+                st.session_state.session_id = dup_sid
+                st.query_params["sid"] = dup_sid
+                st.rerun()
+
+        ac1, ac2 = st.columns(2)
+        with ac1:
+            arch_label = "Desarchiver" if sid_to_archived.get(selected_sid, False) else "Archiver"
+            if st.button(arch_label, use_container_width=True):
+                _archive_conversation(selected_sid, not sid_to_archived.get(selected_sid, False))
+                if selected_sid == session_id and not archived_val and not sid_to_archived.get(selected_sid, False):
+                    next_convs = _list_conversations(limit=100, include_archived=False)
+                    if next_convs:
+                        st.session_state.session_id = next_convs[0][0]
+                        st.query_params["sid"] = next_convs[0][0]
+                st.rerun()
+        with ac2:
+            if st.button("Supprimer", use_container_width=True):
+                st.session_state["confirm_delete_sid"] = selected_sid
+
+        if st.session_state.get("confirm_delete_sid") == selected_sid:
+            st.warning("Confirmer la suppression definitive de cette conversation ?")
+            dc1, dc2 = st.columns(2)
+            with dc1:
+                if st.button("Confirmer suppression", use_container_width=True):
+                    sid_to_delete = selected_sid
+                    _delete_conversation(sid_to_delete)
+                    st.session_state.pop("confirm_delete_sid", None)
+                    if sid_to_delete == session_id:
+                        remaining = [sid for sid in sid_options if sid != sid_to_delete]
+                        if remaining:
+                            next_sid = remaining[0]
+                        else:
+                            next_sid = str(uuid.uuid4())
+                            _ensure_conversation_exists(next_sid)
+                        st.session_state.session_id = next_sid
+                        st.query_params["sid"] = next_sid
+                    st.rerun()
+            with dc2:
+                if st.button("Annuler", use_container_width=True):
+                    st.session_state.pop("confirm_delete_sid", None)
+                    st.rerun()
 
 # Chat input
 user_text = st.chat_input("Pose ta question... (RAG utilisera tes documents si indexes)")
 if user_text:
-    with st.chat_message("user"):
-        st.markdown(user_text)
+    with main_col:
+        with st.chat_message("user"):
+            st.markdown(user_text)
 
     # summarize if needed
     update_summary_if_needed(session_id)
@@ -1414,39 +1930,41 @@ if user_text:
     chat = get_chat_runtime_cached(model_name, float(temperature))
     started = time.time()
 
-    with st.chat_message("assistant"):
-        placeholder = st.empty()
-        acc = ""
+    with main_col:
+        with st.chat_message("assistant"):
+            placeholder = st.empty()
+            acc = ""
 
-        with st.spinner("Reflexion..."):
-            for chunk in chat.stream(
-                {
-                    "input": user_text,
-                    "summary": meta.summary,
-                    "mode": meta.mode,
-                    "mode_instructions": mode_instructions,
-                    "extra_instructions": extra_instructions,
-                    "strict_rule": strict_rule,
-                    "context": context,
-                },
-                config={"configurable": {"session_id": session_id}},
-            ):
-                text = safe_chunk_text(chunk)
-                if text:
-                    acc += text
-                    placeholder.markdown(fix_latex(acc))
+            with st.spinner("Reflexion..."):
+                for chunk in chat.stream(
+                    {
+                        "input": user_text,
+                        "summary": meta.summary,
+                        "mode": meta.mode,
+                        "mode_instructions": mode_instructions,
+                        "extra_instructions": extra_instructions,
+                        "strict_rule": strict_rule,
+                        "context": context,
+                    },
+                    config={"configurable": {"session_id": session_id}},
+                ):
+                    text = safe_chunk_text(chunk)
+                    if text:
+                        acc += text
+                        placeholder.markdown(fix_latex(acc))
 
-        if not acc.strip():
-            placeholder.markdown("(Reponse vide)")
+            if not acc.strip():
+                placeholder.markdown("(Reponse vide)")
 
-        if sources:
-            with st.expander("Sources utilisees"):
-                for s in sources:
-                    st.write(s)
-        elif meta.rag_enabled and meta.rag_ready:
-            st.caption("RAG: aucun passage pertinent trouve. Reformule en citant un mot cle (ex: 'exercice 1').")
-        elif strict_rag:
-            st.warning("Aucune source disponible en mode strict.")
+            if sources:
+                st.caption("Les sources detaillees sont disponibles dans le panneau secondaire.")
+            elif meta.rag_enabled and meta.rag_ready:
+                st.caption("RAG: aucun passage pertinent trouve. Reformule en citant un mot cle (ex: 'exercice 1').")
+            elif strict_rag:
+                st.warning("Aucune source disponible en mode strict.")
+
+    st.session_state["last_sources"] = serialize_sources(docs) if docs else []
+    st.session_state["last_sources_session"] = session_id
 
     update_summary_if_needed(session_id)
 
