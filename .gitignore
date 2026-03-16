@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+
+chat_history.sqlite
+chat_history.sqlite-shm
+chat_history.sqlite-wal
+
+uploads/
+rag_store/
+
+env/
+.venv/
