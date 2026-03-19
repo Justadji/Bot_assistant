@@ -1104,12 +1104,13 @@ def render_source_panel(items: List[dict]) -> None:
         )
         return
 
-    for item in items:
-        title = f"[{item['rank']}] {item['name']}"
-        excerpt = (item["excerpt"] or "").replace("\n", " ").strip()
-        if len(excerpt) > 320:
-            excerpt = excerpt[:317].rstrip() + "..."
-        with st.expander(title, expanded=(item["rank"] == 1)):
+    with st.expander("📚 Sources utilisees", expanded=True):
+        for item in items:
+            title = f"[{item['rank']}] {item['name']}"
+            excerpt = (item["excerpt"] or "").replace("\n", " ").strip()
+            if len(excerpt) > 320:
+                excerpt = excerpt[:317].rstrip() + "..."
+            st.markdown(f"• **{html.escape(title)}**", unsafe_allow_html=True)
             st.markdown(
                 f"""
                 <div class="source-meta">{html.escape(item['location'])}</div>
@@ -1193,6 +1194,7 @@ def _inject_theme() -> None:
             background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(250,244,235,0.88));
             box-shadow: 0 18px 48px rgba(55, 40, 24, 0.08);
             margin-bottom: 1.1rem;
+            text-align: center;
         }
 
         .hero-kicker {
@@ -1210,7 +1212,7 @@ def _inject_theme() -> None:
         }
 
         .hero-kicker::before {
-            content: "AI";
+            content: "NJ";
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -1235,12 +1237,26 @@ def _inject_theme() -> None:
             color: #51606f;
             font-size: 1rem;
             line-height: 1.6;
-            margin: 0;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .hero-eyebrow {
+            margin-top: 0.8rem;
+            color: var(--accent-deep);
+            font-size: 0.92rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
         }
 
         [data-testid="stSidebar"] {
             background: linear-gradient(180deg, rgba(255, 251, 245, 0.97), rgba(247, 240, 230, 0.96));
             border-right: 1px solid var(--line);
+        }
+
+        [data-testid="stSidebar"] * {
+            color: var(--ink);
         }
 
         [data-testid="stSidebar"] .block-container {
@@ -1251,6 +1267,7 @@ def _inject_theme() -> None:
             font-family: Georgia, "Times New Roman", serif;
             font-size: 1.25rem;
             font-weight: 700;
+            color: #18212a;
             margin-bottom: 0.25rem;
         }
 
@@ -1283,6 +1300,7 @@ def _inject_theme() -> None:
             font-family: Georgia, "Times New Roman", serif;
             font-size: 1.15rem;
             font-weight: 700;
+            color: #18212a;
             margin-bottom: 0.2rem;
         }
 
@@ -1290,6 +1308,10 @@ def _inject_theme() -> None:
             color: var(--muted);
             font-size: 0.92rem;
             margin-bottom: 0.9rem;
+        }
+
+        .section-card.compact {
+            padding-bottom: 0.8rem;
         }
 
         .status-card {
@@ -1438,6 +1460,19 @@ def _inject_theme() -> None:
             margin-bottom: 0.75rem;
         }
 
+        [data-testid="stChatMessage"] * {
+            color: #243140 !important;
+        }
+
+        [data-testid="stChatMessage"] p,
+        [data-testid="stChatMessage"] li,
+        [data-testid="stChatMessage"] span,
+        [data-testid="stChatMessage"] div,
+        [data-testid="stChatMessage"] strong,
+        [data-testid="stChatMessage"] em {
+            color: #243140 !important;
+        }
+
         [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
             background: linear-gradient(180deg, rgba(244, 215, 198, 0.92), rgba(253, 245, 239, 0.94));
         }
@@ -1470,6 +1505,120 @@ def _inject_theme() -> None:
             background: linear-gradient(180deg, #fffdf9, #f8efe5);
             color: #243140;
             font-weight: 600;
+        }
+
+        div[role="radiogroup"] label,
+        div[role="radiogroup"] p,
+        div[role="radiogroup"] span {
+            color: #243140 !important;
+        }
+
+        div[role="radiogroup"] label {
+            background: rgba(255, 253, 249, 0.82);
+            border: 1px solid rgba(92, 72, 52, 0.12);
+            border-radius: 999px;
+            padding: 0.45rem 0.9rem;
+        }
+
+        div[role="radiogroup"] label:has(input:checked) {
+            background: rgba(196, 99, 45, 0.12);
+            border-color: rgba(196, 99, 45, 0.24);
+        }
+
+        div[role="radiogroup"] label:has(input:checked) p,
+        div[role="radiogroup"] label:has(input:checked) span {
+            color: var(--accent-deep) !important;
+            font-weight: 700;
+        }
+
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] .stMarkdown,
+        [data-testid="stSidebar"] .stCaption,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span,
+        [data-testid="stSidebar"] small {
+            color: #243140 !important;
+        }
+
+        [data-testid="stSidebar"] [data-baseweb="select"] * {
+            color: #243140 !important;
+        }
+
+        [data-testid="stSidebar"] .stSlider [data-baseweb="slider"] + div,
+        [data-testid="stSidebar"] .stSlider label,
+        [data-testid="stSidebar"] .stToggle label {
+            color: #243140 !important;
+        }
+
+        [data-testid="stSidebar"] input,
+        [data-testid="stSidebar"] textarea,
+        [data-testid="stSidebar"] [data-baseweb="input"] input,
+        [data-testid="stSidebar"] [data-baseweb="base-input"] input,
+        [data-testid="stSidebar"] [data-baseweb="textarea"] textarea,
+        [data-testid="stSidebar"] [data-baseweb="select"] > div,
+        [data-testid="stSidebar"] [data-baseweb="select"] input {
+            color: #f5f1ea !important;
+            -webkit-text-fill-color: #f5f1ea !important;
+        }
+
+        [data-testid="stSidebar"] textarea::placeholder,
+        [data-testid="stSidebar"] input::placeholder,
+        [data-testid="stSidebar"] [data-baseweb="input"] input::placeholder,
+        [data-testid="stSidebar"] [data-baseweb="textarea"] textarea::placeholder {
+            color: rgba(245, 241, 234, 0.68) !important;
+            -webkit-text-fill-color: rgba(245, 241, 234, 0.68) !important;
+        }
+
+        [data-testid="stSidebar"] [data-baseweb="select"] span,
+        [data-testid="stSidebar"] [data-baseweb="select"] div,
+        [data-testid="stSidebar"] [data-baseweb="select"] svg {
+            color: #f5f1ea !important;
+            fill: #f5f1ea !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stFileUploader"] * {
+            color: #f5f1ea !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+            background: #11141c !important;
+            border: 1px solid rgba(245, 241, 234, 0.14) !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] * {
+            color: #f5f1ea !important;
+            fill: #f5f1ea !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] span,
+        [data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] small,
+        [data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] div,
+        [data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] p {
+            color: rgba(245, 241, 234, 0.78) !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button {
+            color: #f5f1ea !important;
+            background: rgba(245, 241, 234, 0.10) !important;
+            border: 1px solid rgba(245, 241, 234, 0.18) !important;
+        }
+
+        [data-testid="collapsedControl"],
+        [data-testid="stSidebarCollapseButton"],
+        button[aria-label="Open sidebar"],
+        button[aria-label="Close sidebar"] {
+            color: #243140 !important;
+            background: rgba(255, 253, 249, 0.92) !important;
+            border: 1px solid rgba(92, 72, 52, 0.15) !important;
+            border-radius: 14px !important;
+            box-shadow: 0 8px 18px rgba(55, 40, 24, 0.08);
+        }
+
+        [data-testid="collapsedControl"] svg,
+        [data-testid="stSidebarCollapseButton"] svg,
+        button[aria-label="Open sidebar"] svg,
+        button[aria-label="Close sidebar"] svg {
+            fill: #243140 !important;
         }
 
         .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"], .stMultiSelect div[data-baseweb="select"] {
@@ -1509,6 +1658,13 @@ else:
     st.query_params["sid"] = st.session_state.session_id
 
 session_id: str = st.session_state.session_id
+page_name = st.query_params.get("page", "chat")
+if isinstance(page_name, list):
+    page_name = page_name[0]
+if page_name not in {"chat", "workspace"}:
+    page_name = "chat"
+st.session_state["ui_page"] = page_name
+
 try:
     _ensure_conversation_exists(session_id)  # assure l'existence sans maj permanente
 except sqlite3.OperationalError as e:
@@ -1526,22 +1682,12 @@ if st.session_state.get("last_sources_session") != session_id:
     st.session_state["last_sources_session"] = session_id
 
 with st.sidebar:
-    st.markdown('<div class="sidebar-title">Configuration</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-title">⚙️ Configuration</div>', unsafe_allow_html=True)
     st.markdown(
         '<div class="sidebar-copy">Pilote le modele, le comportement de reponse et la couche documentaire depuis ce panneau.</div>',
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        """
-        <div class="section-card">
-            <div class="section-label">Session</div>
-            <div class="section-title">Parametres du moteur</div>
-            <div class="section-copy">Reglages generaux du chat et de la generation.</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
     model_name = st.selectbox("Modele", ["gpt-4o-mini", "gpt-4.1-mini"], index=0)
     temperature = st.slider("Temperature", min_value=0.0, max_value=1.0, value=0.3, step=0.05)
     strict_rag = st.toggle("Mode strict sources", value=False, help="Ne repondre que si les sources suffisent.")
@@ -1562,7 +1708,7 @@ with st.sidebar:
         """
         <div class="section-card">
             <div class="section-label">RAG</div>
-            <div class="section-title">Corpus et index</div>
+            <div class="section-title">📚 Documents</div>
             <div class="section-copy">Active le RAG, ajuste le rappel et gere les fichiers a indexer.</div>
         </div>
         """,
@@ -1694,12 +1840,48 @@ if not sid_options:
 
 selected_sid = session_id if session_id in sid_options else sid_options[0]
 
+with st.sidebar:
+    st.markdown(
+        """
+        <div class="section-card compact">
+            <div class="section-label">Conversations</div>
+            <div class="section-title">💬 Conversations</div>
+            <div class="section-copy">Acces rapide a la session active, au changement de conversation et aux actions principales.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    selected_sid = st.selectbox(
+        "Liste",
+        options=sid_options,
+        index=sid_options.index(selected_sid) if selected_sid in sid_options else 0,
+        format_func=lambda sid: sid_to_label.get(sid, sid),
+        key="conversation_selector_sidebar",
+    )
+    if selected_sid != session_id:
+        st.session_state.session_id = selected_sid
+        st.query_params["sid"] = selected_sid
+        st.rerun()
+
+    sc1, sc2 = st.columns(2)
+    with sc1:
+        if st.button("Dupliquer", use_container_width=True, key="duplicate_sidebar_btn"):
+            dup_sid = _duplicate_conversation(selected_sid, f"Copie - {sid_to_title.get(selected_sid, 'Conversation')}")
+            st.session_state.session_id = dup_sid
+            st.query_params["sid"] = dup_sid
+            st.rerun()
+    with sc2:
+        if st.button("Supprimer", use_container_width=True, key="delete_sidebar_btn"):
+            st.session_state["confirm_delete_sid"] = selected_sid
+
 st.markdown(
     f"""
     <div class="hero-shell">
-        <div class="hero-kicker">Assistant documentaire</div>
-        <div class="hero-title">Atelier NJAB</div>
-        <p class="hero-subtitle">Un cockpit de conversation pour interroger tes documents, suivre les sources en direct et piloter tes sessions avec une interface plus claire, plus structurée et plus premium.</p>
+        <div class="hero-kicker">Document Intelligence</div>
+        <div class="hero-title">🧠 NJAB Assistant</div>
+        <p style='text-align: center; font-size:18px;'>AI Assistant with Document Intelligence</p>
+        <div class="hero-eyebrow">Chat • Analyze • Learn</div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -1719,7 +1901,23 @@ with stats[3]:
 with stats[4]:
     render_status_card("Session", session_id[:8], "Conversation courante et historique persistant.")
 
-main_col, side_col = st.columns([1.95, 1.05], gap="large")
+page_labels = {
+    "chat": "Conversation",
+    "workspace": "Panneau secondaire",
+}
+selected_page_label = st.radio(
+    "Navigation principale",
+    options=list(page_labels.values()),
+    index=list(page_labels.keys()).index(st.session_state["ui_page"]),
+    horizontal=True,
+    label_visibility="collapsed",
+)
+current_page = next(key for key, value in page_labels.items() if value == selected_page_label)
+if current_page != st.session_state["ui_page"]:
+    st.session_state["ui_page"] = current_page
+    st.query_params["page"] = current_page
+    st.rerun()
+st.query_params["page"] = current_page
 
 # Popup: creation d'une nouvelle conversation avec titre
 if st.session_state.get("show_new_conv_dialog"):
@@ -1776,7 +1974,7 @@ if st.session_state.get("show_new_conv_dialog"):
                     st.session_state.pop("new_conv_title_fallback", None)
                     st.rerun()
 
-with main_col:
+if current_page == "chat":
     st.markdown(
         """
         <div class="panel-shell">
@@ -1792,13 +1990,12 @@ with main_col:
         role = "user" if m.type == "human" else "assistant" if m.type == "ai" else "assistant"
         with st.chat_message(role):
             st.markdown(fix_latex(m.content))
-
-with side_col:
+else:
     st.markdown(
         """
         <div class="panel-shell">
             <div class="panel-title">Panneau secondaire</div>
-            <div class="panel-copy">Sources, resume, documents actifs et conversations dans une zone laterale dediee.</div>
+            <div class="panel-copy">Sources, resume, documents actifs et conversations sur une page dediee.</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1902,11 +2099,12 @@ with side_col:
                     st.rerun()
 
 # Chat input
-user_text = st.chat_input("Pose ta question... (RAG utilisera tes documents si indexes)")
+user_text = None
+if current_page == "chat":
+    user_text = st.chat_input("Pose ta question... (RAG utilisera tes documents si indexes)")
 if user_text:
-    with main_col:
-        with st.chat_message("user"):
-            st.markdown(user_text)
+    with st.chat_message("user"):
+        st.markdown(user_text)
 
     # summarize if needed
     update_summary_if_needed(session_id)
@@ -1930,38 +2128,37 @@ if user_text:
     chat = get_chat_runtime_cached(model_name, float(temperature))
     started = time.time()
 
-    with main_col:
-        with st.chat_message("assistant"):
-            placeholder = st.empty()
-            acc = ""
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
+        acc = ""
 
-            with st.spinner("Reflexion..."):
-                for chunk in chat.stream(
-                    {
-                        "input": user_text,
-                        "summary": meta.summary,
-                        "mode": meta.mode,
-                        "mode_instructions": mode_instructions,
-                        "extra_instructions": extra_instructions,
-                        "strict_rule": strict_rule,
-                        "context": context,
-                    },
-                    config={"configurable": {"session_id": session_id}},
-                ):
-                    text = safe_chunk_text(chunk)
-                    if text:
-                        acc += text
-                        placeholder.markdown(fix_latex(acc))
+        with st.spinner("Reflexion..."):
+            for chunk in chat.stream(
+                {
+                    "input": user_text,
+                    "summary": meta.summary,
+                    "mode": meta.mode,
+                    "mode_instructions": mode_instructions,
+                    "extra_instructions": extra_instructions,
+                    "strict_rule": strict_rule,
+                    "context": context,
+                },
+                config={"configurable": {"session_id": session_id}},
+            ):
+                text = safe_chunk_text(chunk)
+                if text:
+                    acc += text
+                    placeholder.markdown(fix_latex(acc))
 
-            if not acc.strip():
-                placeholder.markdown("(Reponse vide)")
+        if not acc.strip():
+            placeholder.markdown("(Reponse vide)")
 
-            if sources:
-                st.caption("Les sources detaillees sont disponibles dans le panneau secondaire.")
-            elif meta.rag_enabled and meta.rag_ready:
-                st.caption("RAG: aucun passage pertinent trouve. Reformule en citant un mot cle (ex: 'exercice 1').")
-            elif strict_rag:
-                st.warning("Aucune source disponible en mode strict.")
+        if sources:
+            st.caption("Les sources detaillees sont disponibles dans l'onglet 'Panneau secondaire'.")
+        elif meta.rag_enabled and meta.rag_ready:
+            st.caption("RAG: aucun passage pertinent trouve. Reformule en citant un mot cle (ex: 'exercice 1').")
+        elif strict_rag:
+            st.warning("Aucune source disponible en mode strict.")
 
     st.session_state["last_sources"] = serialize_sources(docs) if docs else []
     st.session_state["last_sources_session"] = session_id
@@ -1997,3 +2194,13 @@ if user_text:
     )
 
     st.rerun()
+
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align:center;font-size:14px'>
+    NJAB Assistant • Powered by OpenAI & LangChain
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
